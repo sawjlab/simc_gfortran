@@ -408,7 +408,7 @@ C DJG:
 	    targ%angle = 0.0
 	    write(6,*) 'Forcing target angle to zero for cryotarget.'
 	  endif
-	  if (targ%can.ne.1 .and. targ%can.ne.2) stop 'bad targ.can value'
+	  if (targ%can.ne.1 .and. targ%can.ne.2 .and. targ%can.ne.3) stop 'bad targ.can value'
 	endif
 	if(sin(targ%angle) .gt. 0.85) then
 	  write(6,*) 'BAD targ.angle (0 is perp. to beam, +ve is rotated towards SOS)'
@@ -453,7 +453,7 @@ C DJG:
 	endif
 
 	if (abs(one_tail).gt.3 .and. using_rad)
-     >     stop 'Moron! one_tail>3 turns radiation off, but using_rad wants it on.'
+     >    stop 'Moron! one_tail>3 turns radiation off, but using_rad wants it on.'
 
 	if (.not.using_rad) then
 	  do i = 1, 3
@@ -486,6 +486,9 @@ C DJG:
 	  cuts%Em%min = -1.d6
 	  cuts%Em%max =  1.d6
 	endif
+
+c	write(6,*) 'Em_min = ', cuts%Em%min
+c	write(6,*) 'Em_max = ', cuts%Em%max
 
 	if (abs(deForest_flag).gt.1) stop 'Idiot! check setting of deForest_flag'
 
@@ -974,6 +977,7 @@ C DJG:
 	ierr = regparmint('using_tgt_field',using_tgt_field,0)
 	ierr = regparmstring('tgt_field_file',tgt_field_file,0)
 	ierr = regparmdouble('drift_to_cal',drift_to_cal,0)
+	ierr = regparmint('col_flag',col_flag,0)
 
 *	E_ARM_ACCEPT
 

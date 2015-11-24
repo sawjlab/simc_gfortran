@@ -1452,6 +1452,7 @@ C DJG moved this to the last part of generate!!!
 !	resmult=resolution factor for DCs (see simulate.inc)
 !	vertical position at target (for reconstruction w/raster MEs).
 !	ok flag
+!       collimator setting for hrsr,hrsl - Added by Barak Schmookler Sep. 29, 2015
 
 	  m2 = Mh2
 	  pathlen = 0.0
@@ -1469,12 +1470,12 @@ C DJG moved this to the last part of generate!!!
 	    call mc_hrsr(spec%p%P, spec%p%theta, delta_P_arm, x_P_arm,
      >		y_P_arm, z_P_arm, dx_P_arm, dy_P_arm, xfp, dxfp, yfp, dyfp,
      >		m2, mc_smear, mc_smear, doing_decay,
-     >		ntup%resfac, fry, ok_P_arm, pathlen)
+     >		ntup%resfac, fry, ok_P_arm, pathlen, col_flag)
 	  else if (hadron_arm.eq.4) then
 	    call mc_hrsl(spec%p%P, spec%p%theta, delta_P_arm, x_P_arm,
      >		y_P_arm, z_P_arm, dx_P_arm, dy_P_arm, xfp, dxfp, yfp, dyfp,
      >		m2, mc_smear, mc_smear, doing_decay,
-     >		ntup%resfac, fry, ok_P_arm, pathlen)
+     >		ntup%resfac, fry, ok_P_arm, pathlen, col_flag)
 	  else if (hadron_arm.eq.5 .or. hadron_arm.eq.6) then
 	    call mc_shms(spec%p%P, spec%p%theta, delta_P_arm, x_P_arm,
      >		y_P_arm, z_P_arm, dx_P_arm, dy_P_arm, xfp, dxfp, yfp, dyfp,
@@ -1635,6 +1636,7 @@ C	  recon%p%delta = (recon%p%P-spec%p%P)/spec%p%P*100.
 !	resmult=resolution factor for DCs (see simulate.inc)
 !	decay flag (hardwired to .false. for electron arm).
 !	ok flag
+!       collimator setting for hrsr,hrsl - Added by Barak Schmookler Sep. 29, 2015
 
 	  m2 = me2
 	  pathlen = 0.0
@@ -1652,12 +1654,12 @@ C	  recon%p%delta = (recon%p%P-spec%p%P)/spec%p%P*100.
 	    call mc_hrsr(spec%e%P, spec%e%theta, delta_E_arm, x_E_arm,
      >		y_E_arm, z_E_arm, dx_E_arm, dy_E_arm, xfp, dxfp, yfp, dyfp,
      >		me2, mc_smear, mc_smear, .false.,
-     >		tmpfact, fry, ok_E_arm, pathlen)
+     >		tmpfact, fry, ok_E_arm, pathlen, col_flag)
 	  else if (electron_arm.eq.4) then
 	    call mc_hrsl(spec%e%P, spec%e%theta, delta_E_arm, x_E_arm,
      >		y_E_arm, z_E_arm, dx_E_arm, dy_E_arm, xfp, dxfp, yfp, dyfp,
      >		me2, mc_smear, mc_smear, .false.,
-     >		tmpfact, fry, ok_E_arm, pathlen)
+     >		tmpfact, fry, ok_E_arm, pathlen, col_flag)
 	  else if (electron_arm.eq.5 .or. electron_arm.eq.6) then
 	    call mc_shms(spec%e%P, spec%e%theta, delta_E_arm, x_E_arm,
      >		y_E_arm, z_E_arm, dx_E_arm, dy_E_arm, xfp, dxfp, yfp, dyfp,

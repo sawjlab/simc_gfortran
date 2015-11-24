@@ -67,7 +67,7 @@ ifeq ($(MYOS),Linux)
   FFLAGS= $(INCLUDES) $(FFLAGSA)
   FFLAG1=$(FFLAGS) -c
   OTHERLIBS = -L$(LIBROOT) -lctp \
-        -L$(CERN_ROOT)/lib $(CERNLIBS) -L/usr/lib
+        -L$(CERN_ROOT)/lib $(CERNLIBS) -L/usr/lib64
   FC  := gfortran
   F77 := gfortran
 endif
@@ -87,7 +87,7 @@ ifeq ($(MYOS),Darwin)
   FFLAGS= $(INCLUDES) $(FFLAGSA)
   FFLAG1=$(FFLAGS) -c
   OTHERLIBS = -L$(LIBROOT) -lctp \
-        -L$(CERN_ROOT)/lib $(CERNLIBS) -L/usr/lib
+        -L$(CERN_ROOT)/lib $(CERNLIBS) -L/usr/lib64
   FC  := gfortran
   F77 := gfortran
 endif

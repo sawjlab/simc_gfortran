@@ -5,6 +5,7 @@
 	real*8 thick,len,dens,zeff,aeff,epart,mpart,Eloss
 	real*8 x,chsi,lambda,gauss1,Eloss_mp,gamma
 	real*8 denscorr,CO,hnup,log10bg,I,beta,Eloss_mp_new
+	real*8 Eloss_save,Ke
 
 	integer typeflag          !1=normal eloss (picked from distribution)
                                   !2=min eloss
@@ -73,13 +74,20 @@ c	  write(6,*) 'ELOSS',Eloss_mp,Eloss_mp_new
 	endif
 
         if (eloss.gt.(epart-mpart)) then
+	   Eloss_save = eloss
+	   Ke = epart-mpart
 	   eloss=(epart-mpart)-0.0000001
 	   numerr=numerr+1
 	   if (numerr.le.10) then
+	      if (numerr.eq.1) write(6,*)'--------------------------------'
 	      write(6,*) 'Eloss>Total KE; forcing Eloss=KE'
+	      write(6,*) 'This occurs in mode',typeflag
+	      write(6,*) 'Energy is',epart,'Kinetic Energy is',ke
+	      write(6,*) 'Eloss is',eloss_save
+	      write(6,*) '--------------------------------'
 	      if (numerr.eq.10) write(6,*) '     FURTHER ELOSS ERRORS SUPPRESSED'
 	   endif
-        endif 
+        endif
 
 	return
 	end

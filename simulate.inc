@@ -77,6 +77,7 @@
 	logical use_benhar_sf
 	character*80 random_state_file
 	integer*4 random_seed
+	integer*4 col_flag
 
 
 	common /gnrl/   Mh, Mh2, Mh2_final, Ebeam, dEbeam, Ebeam_vertex_ave,
@@ -95,7 +96,8 @@
      >    which_pion, using_cit_generation, using_Coulomb, using_Eloss,
      >    correct_Eloss, correct_raster, do_fermi,using_tgt_field,
      >    electron_arm, hadron_arm, use_first_cer,
-     >    transparency, use_benhar_sf, random_state_file, random_seed
+     >    transparency, use_benhar_sf, random_state_file, random_seed,
+     >	  col_flag
 
 ! ........ note: make these first two parameters at least ONE BIGGER than the actual dimensions you want to read in
 	integer*4 ntheorymax,nrhoPmmax

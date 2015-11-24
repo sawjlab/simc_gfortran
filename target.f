@@ -12,7 +12,8 @@
 	real*8 s_target, s_Al, s_kevlar, s_air, s_mylar	! distances travelled
 	real*8 Eloss_target, Eloss_Al,Eloss_air		! energy losses
 	real*8 Eloss_kevlar,Eloss_mylar			! (temporary)
-	real*8 z_can,t,atmp,btmp,ctmp,costmp,th_can	!for the pudding-can target.
+	real*8 z_can,t,atmp,btmp,ctmp,costmp,th_can	! for the pudding-can target.
+	real*8 radius,zcap,zrel,rin,rout                ! for GMP target
 	logical liquid
 
 	s_Al = 0.0
@@ -36,6 +37,8 @@
 	    s_Al = s_Al + 0.0028*inch_cm
 	  else if (targ%can .eq. 2) then	!pudding can (5 mil Al, for now)
 	    s_Al = s_Al + 0.0050*inch_cm
+	  else if (targ%can .eq. 3) then	!GMP Target (entrance window, 0.175 mm Al)
+	    s_Al = s_Al + 0.0175
 	  endif
 	endif
 
@@ -64,6 +67,17 @@
 ! ...... ASSUMES liquid targets are 2.65" wide, and have 5.0 mil Al side walls.
 
 ! ... For SHMS, use SOS windows for now (just a space filler for now).
+
+! ... For GMP Cryo Target:
+! ... width: 3.00", wall thickness: 0.173 mm Al
+! ... the target has a tip of radius 1.5" and thickness 0.132 mm Al
+! ... Although any target length can be set in input file, it's really 15 cm 
+
+! ... compute distances travelled for 12GeV LHRS (RHRS)
+! ... 16.0 mil of Al-foil for the target chamber exit foil
+! ... 10.62" (13.33") of air between scattering chamber and HRS vacuum
+! ... 12.0 mil Kapton for spectrometer entrance (Use mylar, since 
+! .....		X0=28.6cm for Kapton, X0=28.7cm for Mylar) 
 
 20	continue
 	if (electron_arm.eq.1) then		!electron is in HMS
@@ -100,42 +114,72 @@
 	s_target = forward_path
 
 	if (liquid) then
-	  if (targ%can .eq. 1) then		!beer can
-	    side_path = 1.325*inch_cm / abs(sin(theta))
-	    if (forward_path.lt.side_path) then
-	      s_Al = s_Al + 0.005*inch_cm / abs(cos(theta))
-	    else
+	   if (targ%can .eq. 1) then !beer can
+	      side_path = 1.325*inch_cm / abs(sin(theta))
+	      if (forward_path.lt.side_path) then
+		 s_Al = s_Al + 0.005*inch_cm / abs(cos(theta))
+	      else
+		 s_target = side_path
+		 s_Al = s_Al + 0.005*inch_cm / abs(sin(theta))
+	      endif
+	   else if (targ%can .eq. 2) then !pudding can (5 mil Al, for now)
+	      
+!       this is ugly.  Solve for z position where particle intersects can.  The
+!       pathlength is then (z_intersect - z_scatter)/cos(theta)
+!       Angle from center to z_intersect is acos(z_intersect/R).  Therefore the
+!       angle between the particle and wall is pi/2 - (theta - theta_intersect)
+	      
+	      t=tan(theta)**2
+	      atmp=1+t
+	      btmp=-2*zpos*t
+	      ctmp=zpos**2*t-(targ%length/2.)**2
+	      z_can=(-btmp+sqrt(btmp**2-4.*atmp*ctmp))/2./atmp
+	      side_path = (z_can - zpos)/abs(cos(theta))
 	      s_target = side_path
-	      s_Al = s_Al + 0.005*inch_cm / abs(sin(theta))
-	    endif
-	  else if (targ%can .eq. 2) then	!pudding can (5 mil Al, for now)
+	      costmp=z_can/(targ%length/2.)
+	      if (abs(costmp).le.1) then
+		 th_can=acos(z_can/(targ%length/2.))
+	      else if (abs(costmp-1.).le.0.000001) then
+		 th_can=0.	!extreme_trip_thru_target can give z/R SLIGHTLY>1.0
+	      else
+c       stop 'z_can > can radius in target.f !!!'
+		 write(6,*) 'z_can > can radius in target.f !!!',z_can
+c       stop
+	      endif
+	      s_Al = s_Al + 0.0050*inch_cm/abs(sin(target_pi/2 - (theta - th_can)))
 
-! this is ugly.  Solve for z position where particle intersects can.  The
-! pathlength is then (z_intersect - z_scatter)/cos(theta)
-! Angle from center to z_intersect is acos(z_intersect/R).  Therefore the
-! angle between the particle and wall is pi/2 - (theta - theta_intersect)
-
-	    t=tan(theta)**2
-	    atmp=1+t
-	    btmp=-2*zpos*t
-	    ctmp=zpos**2*t-(targ%length/2.)**2
-	    z_can=(-btmp+sqrt(btmp**2-4.*atmp*ctmp))/2./atmp
-	    side_path = (z_can - zpos)/abs(cos(theta))
-            s_target = side_path
-	    costmp=z_can/(targ%length/2.)
-	    if (abs(costmp).le.1) then
-	      th_can=acos(z_can/(targ%length/2.))
-	    else if (abs(costmp-1.).le.0.000001) then
-	      th_can=0.   !extreme_trip_thru_target can give z/R SLIGHTLY>1.0
-	    else
-c	      stop 'z_can > can radius in target.f !!!'
-	       write(6,*) 'z_can > can radius in target.f !!!',z_can
-c	       stop
-	    endif
-	    s_Al = s_Al + 0.0050*inch_cm/abs(sin(target_pi/2 - (theta - th_can)))
-	  endif
-
-	endif		
+	   else if(targ%can .eq. 3) then !GMP Target
+!       I assume here that the spectrometer is placed at an angle less than 90
+!       degrees. Also, since the tip has a radius of 1.5", it really is
+!       best to use this target option with an extended target. Also
+!       the target angle should be at zero degrees...
+	      radius = 1.5*inch_cm 
+	      zcap = (targ%length/2 - radius)
+	      zrel = zpos - zcap
+!       Case 1
+	      if (zrel.lt.0 .and. (abs(zrel)*abs(tan(theta))).ge.radius) then
+		 s_target = radius / abs(sin(theta))
+		 s_Al = s_Al + ( 0.0173 / abs(sin(theta)) )
+!       Case 2
+	      else if (zrel.ge.0) then
+		 rin = radius
+		 rout = rin + 0.0132
+		 
+		 s_target = sqrt( rin**2 - (zrel * abs(sin(theta)))**2 ) - (zrel * abs(cos(theta)))
+		 s_Al = s_Al + ( sqrt( rout**2 - (zrel * abs(sin(theta)))**2 ) - sqrt( rin**2 - (zrel * abs(sin(theta)))**2 ) )
+!       Case 3
+	      else if ( zrel.lt.0 .and. (abs(zrel)*abs(tan(theta))).lt.radius) then
+		 rin = radius
+		 rout = rin + 0.0132
+		 
+		 s_target = sqrt( rin**2 - (abs(zrel) * abs(sin(theta)))**2 ) + (abs(zrel)*abs(cos(theta)))
+		 s_Al = s_Al + ( sqrt( rout**2 - (abs(zrel) * abs(sin(theta)))**2 ) - sqrt( rin**2 - (abs(zrel) * abs(sin(theta)))**2 ) )
+		 
+	      else
+		 write(6,*) 'There is some issue with the GMP target'
+	      endif
+	   endif
+	endif
 
 ! ... compute distance in radiation lengths and energy loss
 	radlen = s_target/targ%X0_cm + s_Al/X0_cm_Al + s_air/X0_cm_air +
@@ -194,41 +238,73 @@ c	       stop
 
 	s_target = forward_path
 	if (liquid) then
-	  if (targ%can .eq. 1) then		!beer can
-	    side_path = 1.325*inch_cm/ abs(sin(theta))
-	    if (forward_path.lt.side_path) then
-	      s_Al = s_Al + 0.005*inch_cm / abs(cos(theta))
-	    else
+	   if (targ%can .eq. 1) then !beer can
+	      side_path = 1.325*inch_cm/ abs(sin(theta))
+	      if (forward_path.lt.side_path) then
+		 s_Al = s_Al + 0.005*inch_cm / abs(cos(theta))
+	      else
+		 s_target = side_path
+		 s_Al = s_Al + 0.005*inch_cm / abs(sin(theta))
+	      endif
+	   else if (targ%can .eq. 2) then !pudding can (5 mil Al, for now)
+	      
+!       this is ugly.  Solve for z position where particle intersects can.  The
+!       pathlength is then (z_intersect - z_scatter)/cos(theta)
+!       Angle from center to z_intersect is acos(z_intersect/R).  Therefore the
+!       angle between the particle and wall is pi/2 - (theta - theta_intersect)
+	      
+	      t=tan(theta)**2
+	      atmp=1+t
+	      btmp=-2*zpos*t
+	      ctmp=zpos**2*t-(targ%length/2.)**2
+	      z_can=(-btmp+sqrt(btmp**2-4.*atmp*ctmp))/2./atmp
+	      side_path = (z_can - zpos)/abs(cos(theta))
 	      s_target = side_path
-	      s_Al = s_Al + 0.005*inch_cm / abs(sin(theta))
-	    endif
-	  else if (targ%can .eq. 2) then	!pudding can (5 mil Al, for now)
-
-! this is ugly.  Solve for z position where particle intersects can.  The
-! pathlength is then (z_intersect - z_scatter)/cos(theta)
-! Angle from center to z_intersect is acos(z_intersect/R).  Therefore the
-! angle between the particle and wall is pi/2 - (theta - theta_intersect)
-
-	    t=tan(theta)**2
-	    atmp=1+t
-	    btmp=-2*zpos*t
-	    ctmp=zpos**2*t-(targ%length/2.)**2
-	    z_can=(-btmp+sqrt(btmp**2-4.*atmp*ctmp))/2./atmp
-	    side_path = (z_can - zpos)/abs(cos(theta))
-            s_target = side_path
-	    costmp=z_can/(targ%length/2.)
-	    if (abs(costmp).le.1) then
-	      th_can=acos(z_can/(targ%length/2.))
-	    else if (abs(costmp-1.).le.0.000001) then
-	      th_can=0.   !extreme_trip_thru_target can give z/R SLIGHTLY>1.0
-	    else
-c	      stop 'z_can > can radius in target.f !!!'
-	      write(6,*) 'z_can > can radius in target.f !!!',t,theta
-c	      stop
-	    endif
-	    s_Al = s_Al + 0.0050*inch_cm/abs(sin(target_pi/2 - (theta - th_can)))
-	  endif
-
+	      costmp=z_can/(targ%length/2.)
+	      if (abs(costmp).le.1) then
+		 th_can=acos(z_can/(targ%length/2.))
+	      else if (abs(costmp-1.).le.0.000001) then
+		 th_can=0.	!extreme_trip_thru_target can give z/R SLIGHTLY>1.0
+	      else
+c       stop 'z_can > can radius in target.f !!!'
+		 write(6,*) 'z_can > can radius in target.f !!!',t,theta
+c       stop
+	      endif
+	      s_Al = s_Al + 0.0050*inch_cm/abs(sin(target_pi/2 - (theta - th_can)))
+	      
+	      
+	   else if(targ%can .eq. 3) then !GMP Target
+!       I assume here that the spectrometer is placed at an angle less than 90
+!       degrees. Also, since the tip has a radius of 1.5", it really is
+!       best to use this target option with an extended target. Also
+!       the target angle should be at zero degrees...
+	      radius = 1.5*inch_cm 
+	      zcap = (targ%length/2 - radius)
+	      zrel = zpos - zcap
+!       Case 1
+	      if (zrel.lt.0 .and. (abs(zrel)*abs(tan(theta))).ge.radius) then
+		 s_target = radius / abs(sin(theta))
+		 s_Al = s_Al + ( 0.0173 / abs(sin(theta)) )
+!       Case 2
+	      else if (zrel.ge.0) then
+		 rin = radius
+		 rout = rin + 0.0132
+		 
+		 s_target = sqrt( rin**2 - (zrel * abs(sin(theta)))**2 ) - (zrel * abs(cos(theta)))
+		 s_Al = s_Al + ( sqrt( rout**2 - (zrel * abs(sin(theta)))**2 ) - sqrt( rin**2 - (zrel * abs(sin(theta)))**2 ) )
+!       Case 3
+	      else if ( zrel.lt.0 .and. (abs(zrel)*abs(tan(theta))).lt.radius) then
+		 rin = radius
+		 rout = rin + 0.0132
+		 
+		 s_target = sqrt( rin**2 - (abs(zrel) * abs(sin(theta)))**2 ) + (abs(zrel)*abs(cos(theta)))
+		 s_Al = s_Al + ( sqrt( rout**2 - (abs(zrel) * abs(sin(theta)))**2 ) - sqrt( rin**2 - (abs(zrel) * abs(sin(theta)))**2 ) )
+		 
+	      else
+		 write(6,*) 'There is some issue with the GMP target'
+	      
+	      endif	  
+	   endif
 	endif
 
 ! ... compute energy losses
@@ -267,8 +343,9 @@ c	      stop
 	type(limits):: the, thp, pe, pp, z, betap
 	integer	i
 	real*8 th_corner, th_corner_min, th_corner_max
-	real*8 E1, E2, E3, E4, t1, t2, t3, t4
-	real*8 zz, th1, th2, m
+	real*8 E1, E2, E3, E4, E5, t1, t2, t3, t4, t5
+	real*8 E1temp, E2temp, t1temp, t2temp
+	real*8 zz, th1, th2, th3, th4, th5, m
 	real*8 ebeam, energymin, energymax
 	logical	liquid
 
@@ -307,19 +384,21 @@ C the perfect range, but it's easier than reproducing the generated limits here
      &           targ%Eloss(2)%min, targ%teff(2)%min, Me, 2)
 
 ! ... liquid
+! ... (I think '1.25' should be replaced by '1.325'
+! ... for the Beer Can... Barak S.)
 	else if (targ%can .eq. 1) then		!beer can
 	  if (z%max.ge.targ%length/2.) then
 	    th_corner_max = target_pi/2.
 	  else
-	    th_corner_max = atan(1.25*inch_cm/(targ%length/2.-z%max))
+	    th_corner_max = atan(1.325*inch_cm/(targ%length/2.-z%max))
 	  endif
-	  th_corner_min = atan(1.25*inch_cm/(targ%length/2.-z%min))
+	  th_corner_min = atan(1.325*inch_cm/(targ%length/2.-z%min))
 
 ! ... max loss: do we have access to a corner shot?  try a hair on either
 ! ... side, front or side walls could be thicker (too lazy to check!)
 	  if (th_corner_min.le.the%max .and. th_corner_max.ge.the%min) then
 	    th_corner = max(th_corner_min,the%min)
-	    zz = targ%length/2. - 1.25*inch_cm/tan(th_corner)
+	    zz = targ%length/2. - 1.325*inch_cm/tan(th_corner)
 	    th1 = th_corner-.0001
 	    th2 = th_corner+.0001
 	  else
@@ -364,12 +443,75 @@ C the perfect range, but it's easier than reproducing the generated limits here
 	    call trip_thru_target (2, z%min+int(i/2)*(z%max-z%min), energymin,
      >			the%min+mod(i,2)*(the%max-the%min), E1, t1, Me, 2)
 	    if (E1 .lt. targ%Eloss(2)%min) then
-	      targ%Eloss(2)%min = E1
-	      targ%teff(2)%min = t1
+	       targ%Eloss(2)%min = E1
+	       targ%teff(2)%min = t1
 	    endif
-	  enddo
+	 enddo
+	 
+	else if (targ%can .eq. 3) then !GMP Target
+! ........ I make the assumption here that theta < 90 degrees
+! ........ This might not be perfect, but I think it's close
+! ........ enough. The way I do it here, I suppose it's possible
+! ........ (although I doubt it) that the max eloss and radiation 
+! ........ length come from different tracks
+	   
+! ........ max loss will be at zpos = zmin
+! ........ Again I'm assuming theta < 90 degrees
+	   if (z%max.ge.targ%length/2.) then !This should always be true
+	      th_corner_max = target_pi/2. 
+	   else
+	      th_corner_max = atan(1.5*inch_cm/(targ%length/2.-z%max))
+	   endif
+! angle to start of end-cap
+	   th_corner_min = atan( (1.5*inch_cm)/(targ%length -(1.5*inch_cm)) )
+	   
+	   if (th_corner_min.le.the%max .and. th_corner_max.ge.the%min) then
+	      
+	      if (th_corner_min.lt.the%min) then
+		 zz = z%min
+		 th1 = the%min
+		 
+		 call trip_thru_target(2, zz, energymax, th1, E1, t1, Me, 3);
+		 targ%Eloss(2)%max = E1
+		 targ%teff(2)%max = t1
+		 
+	      else
+		 zz = z%min
+!       Check a few different angles here
+		 th1 = the%min
+		 th2 = the%min + ( 0.25*(th_corner_min - the%min) )
+		 th3 = the%min + ( 0.50*(th_corner_min - the%min) )
+		 th4 = the%min + ( 0.75*(th_corner_min - the%min) )
+		 th5 = th_corner_min !Calls 'case 1' in trip_thru_target
+		 
+		 call trip_thru_target(2, zz, energymax, th1, E1, t1, Me, 3)
+		 call trip_thru_target(2, zz, energymax, th2, E2, t2, Me, 3)
+		 call trip_thru_target(2, zz, energymax, th3, E3, t3, Me, 3)
+		 call trip_thru_target(2, zz, energymax, th4, E4, t4, Me, 3)
+		 call trip_thru_target(2, zz, energymax, th5, E5, t5, Me, 3)
+		 targ%Eloss(2)%max = max(E1,E2,E3,E4,E5)
+		 targ%teff(2)%max = max(t1,t2,t3,t4,t5)
+	      endif
+	      
+	   else
+	      zz = z%min
+	      th1 = the%min
+	      th2 = the%max
+	      
+	      call trip_thru_target(2, zz, energymax, th1, E1, t1, Me, 3)
+	      call trip_thru_target(2, zz, energymax, th2, E2, t2, Me, 3)
+	      targ%Eloss(2)%max = max(E1,E2)
+	      targ%teff(2)%max = max(t1,t2)	
+	   endif
+	  
+! ........ min loss will occur when zpos = zmax and theta = thetamin
+! ........ Again I'm assuming theta < 90 degrees
+	   call trip_thru_target (2, z%max, energymin, the%min, E1, t1, Me, 2)
+	   targ%Eloss(2)%min = E1
+	   targ%teff(2)%min = t1
+	   
 	endif
-
+	
 ! Scattered proton. As you can see I'm sufficiently lazy to make
 ! the code work out whether high or low beta
 ! maximizes or minimizes loss ... always lower beta --> higher
@@ -394,19 +536,21 @@ C the perfect range, but it's easier than reproducing the generated limits here
 	  targ%teff(3)%min = min(t1,t2)
 
 ! ... liquid
+! ... (I think '1.25' should be replaced by '1.325'
+! ... for the Beer Can... Barak S.)
 	else if (targ%can .eq. 1) then	!beer can
 	  if (z%max .ge. targ%length/2.) then
 	    th_corner_max = target_pi/2.
 	  else
-	    th_corner_max = atan(1.25*inch_cm/(targ%length/2.-z%max))
+	    th_corner_max = atan(1.325*inch_cm/(targ%length/2.-z%max))
 	  endif
-	  th_corner_min = atan(1.25*inch_cm/(targ%length/2.-z%min))
+	  th_corner_min = atan(1.325*inch_cm/(targ%length/2.-z%min))
 ! ........ max loss: do we have access to a corner shot?
 ! ........ try a hair on either side, front or side walls could be
 ! thicker (too lazy to check!)
 	  if (th_corner_min.le.thp%max .and. th_corner_max.ge.thp%min) then
 	    th_corner = max(th_corner_min,thp%min)
-	    zz = targ%length/2. - 1.25*inch_cm/tan(th_corner)
+	    zz = targ%length/2. - 1.325*inch_cm/tan(th_corner)
 	    th1 = th_corner-.0001
 	    th2 = th_corner+.0001
 	  else
@@ -436,6 +580,7 @@ C the perfect range, but it's easier than reproducing the generated limits here
 	  enddo
 	  call trip_thru_target (3, zz, energymax, th1, E1, t1, m, 2)
 	  targ%Eloss(3)%min = min(targ%Eloss(3)%min, E1)
+
 	else if (targ%can .eq. 2) then	!pudding can
 
 ! ... for pudding can, max loss occurs at lowest scattering angle, where
@@ -467,6 +612,85 @@ C the perfect range, but it's easier than reproducing the generated limits here
 	  call trip_thru_target (3, zz, energymax, th1, E1, t1, m, 2)
 	  targ%Eloss(3)%min = min(targ%Eloss(3)%min, E1)
 
+	else if (targ%can .eq. 3) then !GMP Target
+! ........ I make the assumption here that theta < 90 degrees
+! ........ This might not be perfect, but I think it's close
+! ........ enough. The way I do it here, I suppose it's possible
+! ........ (although I doubt it) that the max eloss and radiation 
+! ........ length come from different tracks
+	   
+! ........ max loss will be at zpos = zmin
+! ........ Again I'm assuming theta < 90 degrees
+	   if (z%max.ge.targ%length/2.) then !This should always be true
+	      th_corner_max = target_pi/2. 
+	   else
+	      th_corner_max = atan(1.5*inch_cm/(targ%length/2.-z%max))
+	   endif
+!       angle to start of end-cap
+	   th_corner_min = atan( (1.5*inch_cm)/(targ%length -(1.5*inch_cm)) )
+	   
+	   if (th_corner_min.le.thp%max .and. th_corner_max.ge.thp%min) then
+	      
+	      if (th_corner_min.lt.thp%min) then
+		 zz = z%min
+		 th1 = thp%min
+		 
+		 call trip_thru_target(3, zz, energymin, th1, E1, t1, m, 3);
+		 call trip_thru_target(3, zz, energymax, th1, E2, t2, m, 3);
+		 targ%Eloss(3)%max = max(E1,E2)
+		 targ%teff(3)%max = max(t1,t2)
+		 
+	      else
+		 zz = z%min
+!       Check a few different angles here
+		 th1 = thp%min
+		 th2 = thp%min + ( 0.25*(th_corner_min - thp%min) )
+		 th3 = thp%min + ( 0.50*(th_corner_min - thp%min) )
+		 th4 = thp%min + ( 0.75*(th_corner_min - thp%min) )
+		 th5 = th_corner_min !Calls 'case 1' in trip_thru_target
+		 
+		 call trip_thru_target(3, zz, energymin, th1, E1, t1, m, 3)
+		 call trip_thru_target(3, zz, energymin, th2, E2, t2, m, 3)
+		 call trip_thru_target(3, zz, energymin, th3, E3, t3, m, 3)
+		 call trip_thru_target(3, zz, energymin, th4, E4, t4, m, 3)
+		 call trip_thru_target(3, zz, energymin, th5, E5, t5, m, 3)	
+		 E1temp = max(E1,E2,E3,E4,E5)
+		 t1temp= max(t1,t2,t3,t4,t5)
+		 
+		 call trip_thru_target(3, zz, energymax, th1, E1, t1, m, 3)
+		 call trip_thru_target(3, zz, energymax, th2, E2, t2, m, 3)
+		 call trip_thru_target(3, zz, energymax, th3, E3, t3, m, 3)
+		 call trip_thru_target(3, zz, energymax, th4, E4, t4, m, 3)
+		 call trip_thru_target(3, zz, energymax, th5, E5, t5, m, 3)
+		 E2temp = max(E1,E2,E3,E4,E5)
+		 t2temp= max(t1,t2,t3,t4,t5)
+		 
+		 targ%Eloss(3)%max = max(E1temp,E2temp)
+		 targ%teff(3)%max = max(t1temp,t2temp)
+	      endif
+	      
+	   else
+	      zz = z%min
+	      th1 = the%min
+	      th2 = the%max
+	      
+	      call trip_thru_target(3, zz, energymin, th1, E1, t1, m, 3)
+	      call trip_thru_target(3, zz, energymin, th2, E2, t2, m, 3)
+	      call trip_thru_target(3, zz, energymax, th1, E3, t3, m, 3)
+	      call trip_thru_target(3, zz, energymax, th2, E4, t4, m, 3)
+	      
+	      targ%Eloss(3)%max = max(E1,E2,E3,E4)
+	      targ%teff(3)%max = max(t1,t2,t3,t4)
+	   endif
+	
+! ........ min loss will occur when zpos = zmax and theta = thetamin
+! ........ Again I'm assuming theta < 90 degrees
+	  
+	   call trip_thru_target (3, z%max, energymin, the%min, E1, t1, m, 2)
+	   call trip_thru_target (3, z%max, energymax, the%min, E2, t2, m, 2)
+	   
+	   targ%Eloss(3)%min = max(E1,E2)
+	   targ%teff(3)%min = min(t1,t2)
 	endif
 
 *JRA*! Extreme multiple scattering

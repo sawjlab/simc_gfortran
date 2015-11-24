@@ -1,6 +1,7 @@
 	subroutine mc_hrsl (p_spec, th_spec, dpp, x, y, z, dxdz, dydz,
      >		x_fp, dx_fp, y_fp, dy_fp, m2,
-     >		ms_flag, wcs_flag, decay_flag, resmult, fry, ok_spec, pathlen)
+     >		ms_flag, wcs_flag, decay_flag, resmult, fry, ok_spec, pathlen,
+     >          collimator)
 
 C+______________________________________________________________________________
 !
@@ -30,43 +31,6 @@ C Spectrometer definitions - for double arm monte carlo compatability
 	integer*4 spectr
 	parameter (spectr = 4)	!hrs-left is spec #4.
 
-C Collimator (rectangle) dimensions and offsets.
-
-	real*8  h_entr,v_entr	!horiz. and vert. 1/2 gap of fixed slit
-	real*8  h_exit,v_exit	!horiz. and vert. 1/2 gap of fixed slit
-	real*8  y_off,x_off	!horiz. and vert. position offset of slit
-	real*8  z_off		!offset in distance from target to front of sli+
-
-! Option for mock sieve slit.  Just take particles and forces trajectory
-! to put the event in the nearest hole.  Must choose the "No collimator"
-! values for the h(v)_entr and h(v)_exit values.
-! Note that this will mess up the physics distributions somewhat, but it
-! should still be pretty good for optics. Physics limits (e.g. elastic
-! peak at x<=1) will not be preserved.
-
-	logical use_sieve /.false./		!use a fake sieve slit.
-
-! No collimator - wide open
-!	parameter (h_entr = 99.)
-!	parameter (v_entr = 99.)
-!	parameter (h_exit = 99.)
-!	parameter (v_exit = 99.)
-
-! Large collimator: (hallaweb.jlab.org/news/minutes/collimator-distance.html)
-	parameter (h_entr = 3.145)
-	parameter (v_entr = 6.090)
-	parameter (h_exit = 3.335)	!0.1mm narrower than 'hadron arm'.
-	parameter (v_exit = 6.485)
-
-	parameter (y_off  = 0.0)
-	parameter (x_off  = 0.0)
-	parameter (z_off  = 0.0)
-
-! z-position of important apertures.
-	real*8 z_entr,z_exit
-	parameter (z_entr = 110.9d0 + z_off)	!nominally 1.109 m
-	parameter (z_exit = z_entr + 8.0d0)	!8.0 cm thick
-
 C Math constants
 
 	real*8 d_r,r_d
@@ -86,6 +50,41 @@ C The arguments
 	logical	wcs_flag			!wire chamber smearing flag
 	logical	decay_flag			!check for particle decay
 	logical	ok_spec				!true if particle makes it
+	integer*4 collimator                    !position of collimator
+
+C Option for "wide open" configuration
+        
+	logical use_open /.false./
+        
+C Option for "Large collimator" configuration
+        
+	logical use_coll /.false./
+
+C Option for mock sieve slit.  Just take particles and forces trajectory
+! to put the event in the nearest hole.  Must choose the "No collimator"
+! values for the h(v)_entr and h(v)_exit values.
+! Note that this will mess up the physics distributions somewhat, but it
+! should still be pretty good for optics. Physics limits (e.g. elastic
+! peak at x<=1) will not be preserved.
+	
+	logical use_sieve /.false./ !use a fake sieve slit.
+
+C Collimator (rectangle) dimensions and offsets.
+
+	real*8  h_entr,v_entr	!horiz. and vert. 1/2 gap of fixed slit
+	real*8  h_exit,v_exit	!horiz. and vert. 1/2 gap of fixed slit
+	real*8  y_off,x_off	!horiz. and vert. position offset of slit
+	real*8  z_off		!offset in distance from target to front of sli+
+
+! Offsets...
+	parameter (y_off  = 0.0)
+	parameter (x_off  = 0.0)
+	parameter (z_off  = 0.0)
+
+! z-position of important apertures.
+	real*8 z_entr,z_exit
+	parameter (z_entr = 110.9d0 + z_off)	!nominally 1.109 m
+	parameter (z_exit = z_entr + 8.0d0)	!8.0 cm thick
 
 C Local declarations.
 
@@ -109,12 +108,44 @@ C Local declarations.
 
 C ================================ Executable Code =============================
 
+
 ! Initialize ok_spec to .flase., restet decay flag
 
 	ok_spec = .false.
 	dflag = .false.			!particle has not decayed yet
 	lSTOP_trials = lSTOP_trials + 1
 	xt = th_spec    !avoid 'unused variable' error for th_spec
+
+! Collimator Option
+        if (first_time_here) then
+           if(collimator .eq. 0) then
+              use_open = .true.
+           endif
+           
+           if(collimator .eq. 1) then
+              use_coll = .true.
+           endif
+           
+           if(collimator .eq. 2) then
+              use_sieve = .true.
+           endif
+           
+	   ! No collimator - wide open
+           if (use_open .or. use_sieve) then
+              h_entr = 99.
+              v_entr = 99.
+              h_exit = 99.
+              v_exit = 99.
+           endif
+           
+	   ! Large collimator: (hallaweb.jlab.org/news/minutes/collimator-distance.html)
+           if (use_coll) then
+              h_entr = 3.145
+              v_entr = 6.090
+              h_exit = 3.335    !0.1mm narrower than 'hadron arm'.
+              v_exit = 6.485
+           endif
+        endif	
 
 ! Force particles to go through the sieve slit holes, for mock sieve option.
 ! Use z_exit, since sieve slit is ~8cm behind normal collimator.
